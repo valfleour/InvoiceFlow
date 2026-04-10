@@ -7,8 +7,10 @@
     "dev": "node scripts/dev.mjs",
     "dev:server": "cd server && npm run dev",
     "dev:client": "cd client && npm run dev",
+    "build": "cd server && npm run build",
     "build:server": "cd server && npm run build",
     "build:client": "cd client && npm run build",
+    "start": "cd server && npm start",
     "install:all": "cd server && npm install && cd ../client && npm install",
     "seed:mock": "cd server && npm run seed:mock",
     "github:profile": "powershell -ExecutionPolicy Bypass -File ./scripts/github-profile.ps1"
