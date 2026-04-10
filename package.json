@@ -4,13 +4,14 @@
     "private": true,
     "description": "InvoiceFlow - Domain-Driven Invoice Management System",
     "scripts": {
+    "postinstall": "npm --prefix server install && npm --prefix server run build",
     "dev": "node scripts/dev.mjs",
     "dev:server": "cd server && npm run dev",
     "dev:client": "cd client && npm run dev",
-    "build": "cd server && npm run build",
+    "build": "npm --prefix server run build",
     "build:server": "cd server && npm run build",
     "build:client": "cd client && npm run build",
-    "start": "cd server && npm start",
+    "start": "npm --prefix server start",
     "install:all": "cd server && npm install && cd ../client && npm install",
     "seed:mock": "cd server && npm run seed:mock",
     "github:profile": "powershell -ExecutionPolicy Bypass -File ./scripts/github-profile.ps1"
