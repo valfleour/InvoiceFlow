@@ -1,0 +1,39 @@
+{
+  "name": "server",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "build": "tsc",
+    "test": "npm run build && node --test --experimental-test-isolation=none \"dist/**/*.test.js\"",
+    "start": "node dist/index.js",
+    "migrate:backfill-workspace-ids": "node scripts/backfillWorkspaceIds.js",
+    "seed:mock": "node scripts/seedMockData.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.0",
+    "express": "^4.22.1",
+    "express-async-errors": "^3.1.1",
+    "helmet": "^8.1.0",
+    "mongoose": "^9.3.3",
+    "nodemailer": "^8.0.5",
+    "pdfkit": "^0.18.0",
+    "uuid": "^13.0.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.5.0",
+    "@types/nodemailer": "^8.0.0",
+    "@types/pdfkit": "^0.17.5",
+    "@types/uuid": "^10.0.0",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^6.0.2"
+  }
+}

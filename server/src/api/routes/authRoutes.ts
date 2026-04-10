@@ -1,0 +1,100 @@
+import { Request, Response, Router } from 'express';
+import { AuthService } from '../../application/auth/AuthService';
+import { authenticate, AuthenticatedRequest } from '../middleware/authenticate';
+import { validate } from '../middleware/validate';
+import {
+    ForgotPasswordSchema,
+    RequestEmailVerificationSchema,
+    ResetPasswordSchema,
+    SignInSchema,
+    SignUpSchema,
+    UpdateProfileSchema,
+    VerifyEmailSchema,
+} from '../validation/schemas';
+
+function toAuthPayload(user: { id: string; name: string; email: string; workspaceId: string | null; emailVerifiedAt?: Date | null; isEmailVerified?: () => boolean }) {
+    return {
+        user: {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            workspaceId: user.workspaceId,
+            emailVerifiedAt: user.emailVerifiedAt ?? null,
+            isEmailVerified: typeof user.isEmailVerified === 'function'
+                ? user.isEmailVerified()
+                : Boolean(user.emailVerifiedAt),
+        },
+    };
+}
+
+export function authRoutes(service: AuthService): Router {
+    const router = Router();
+
+    router.post('/signup', validate(SignUpSchema), async (req: Request, res: Response) => {
+        const user = await service.register(req.body);
+        res.status(201).json({
+            ...toAuthPayload(user),
+            verificationRequired: true,
+            message: 'Account created. Verify your email before signing in.',
+        });
+    });
+
+    router.post('/signin', validate(SignInSchema), async (req: Request, res: Response) => {
+        const result = await service.signIn(req.body, { ipAddress: req.ip });
+
+        if (!result) {
+            res.status(401).json({ error: 'Invalid email or password' });
+            return;
+        }
+
+        res.json({
+            ...toAuthPayload(result.user),
+            session: {
+                token: result.sessionToken,
+                expiresAt: result.sessionExpiresAt,
+            },
+        });
+    });
+
+    router.post('/verify-email/request', validate(RequestEmailVerificationSchema), async (req: Request, res: Response) => {
+        await service.requestEmailVerification(req.body);
+        res.json({
+            message: 'If an unverified account exists for that email, a verification link has been sent.',
+        });
+    });
+
+    router.post('/verify-email/confirm', validate(VerifyEmailSchema), async (req: Request, res: Response) => {
+        await service.verifyEmail(req.body);
+        res.json({
+            message: 'Email verification successful. You can now sign in.',
+        });
+    });
+
+    router.post('/forgot-password', validate(ForgotPasswordSchema), async (req: Request, res: Response) => {
+        await service.requestPasswordReset(req.body);
+        res.json({
+            message: 'If an account exists for that email, a password reset link has been sent.',
+        });
+    });
+
+    router.post('/reset-password', validate(ResetPasswordSchema), async (req: Request, res: Response) => {
+        await service.resetPassword(req.body);
+        res.json({
+            message: 'Password reset successful. You can now sign in with your new password.',
+        });
+    });
+
+    router.patch('/me', authenticate(service), validate(UpdateProfileSchema), async (req: Request, res: Response) => {
+        const authenticatedRequest = req as AuthenticatedRequest;
+        const user = await service.updateProfile(authenticatedRequest.auth.userId, req.body);
+        res.json(toAuthPayload(user));
+    });
+
+    router.post('/signout', authenticate(service), async (req: Request, res: Response) => {
+        const authenticatedRequest = req as AuthenticatedRequest;
+        await service.signOut(authenticatedRequest.auth.sessionToken);
+        res.status(204).send();
+    });
+
+    return router;
+}

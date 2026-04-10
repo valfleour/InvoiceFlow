@@ -1,0 +1,15 @@
+{
+    "name": "invoiceflow",
+    "version": "1.0.0",
+    "private": true,
+    "description": "InvoiceFlow - Domain-Driven Invoice Management System",
+    "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:server": "cd server && npm run dev",
+    "dev:client": "cd client && npm run dev",
+    "build:server": "cd server && npm run build",
+    "build:client": "cd client && npm run build",
+    "install:all": "cd server && npm install && cd ../client && npm install",
+    "seed:mock": "cd server && npm run seed:mock"
+    }
+}
