@@ -10,6 +10,7 @@
     "build:server": "cd server && npm run build",
     "build:client": "cd client && npm run build",
     "install:all": "cd server && npm install && cd ../client && npm install",
-    "seed:mock": "cd server && npm run seed:mock"
+    "seed:mock": "cd server && npm run seed:mock",
+    "github:profile": "powershell -ExecutionPolicy Bypass -File ./scripts/github-profile.ps1"
     }
 }
