@@ -16,6 +16,18 @@ export interface RegisterUserCommand {
     password: string;
 }
 
+export type EmailVerificationDispatchStatus =
+    | 'sent'
+    | 'delivery_not_configured'
+    | 'skipped_cooldown'
+    | 'skipped_rate_limit'
+    | 'ignored';
+
+export interface RegisterResult {
+    user: User;
+    emailVerificationStatus: EmailVerificationDispatchStatus;
+}
+
 export interface SignInCommand {
     email: string;
     password: string;
@@ -78,7 +90,7 @@ export class AuthService {
         private readonly signInThrottle = new SignInThrottle()
     ) { }
 
-    async register(command: RegisterUserCommand): Promise<User> {
+    async register(command: RegisterUserCommand): Promise<RegisterResult> {
         const email = command.email.trim().toLowerCase();
         if (await this.userRepo.existsByEmail(email)) {
             throw new Error('A user with this email already exists');
@@ -96,8 +108,11 @@ export class AuthService {
         const workspace = await this.workspaceRepo.save(Workspace.create({ ownerUserId: savedUser.id }));
         savedUser.assignWorkspace(workspace.id);
         const persistedUser = await this.userRepo.update(savedUser);
-        await this.issueEmailVerification(persistedUser);
-        return persistedUser;
+        const emailVerificationStatus = await this.issueEmailVerification(persistedUser);
+        return {
+            user: persistedUser,
+            emailVerificationStatus,
+        };
     }
 
     async signIn(command: SignInCommand, context?: { ipAddress?: string }): Promise<SignInResult | null> {
@@ -148,15 +163,15 @@ export class AuthService {
         };
     }
 
-    async requestEmailVerification(command: RequestEmailVerificationCommand): Promise<void> {
+    async requestEmailVerification(command: RequestEmailVerificationCommand): Promise<EmailVerificationDispatchStatus> {
         const email = command.email.trim().toLowerCase();
         const user = await this.userRepo.findByEmail(email);
 
         if (!user || user.deletedAt || user.isDisabled || user.isEmailVerified()) {
-            return;
+            return 'ignored';
         }
 
-        await this.issueEmailVerification(user);
+        return this.issueEmailVerification(user);
     }
 
     async verifyEmail(command: VerifyEmailCommand): Promise<void> {
@@ -271,12 +286,12 @@ export class AuthService {
         return this.userRepo.update(user);
     }
 
-    private async issueEmailVerification(user: User): Promise<void> {
+    private async issueEmailVerification(user: User): Promise<EmailVerificationDispatchStatus> {
         const now = new Date(Date.now());
         const lastSentAt = user.emailVerificationLastSentAt;
 
         if (lastSentAt && now.getTime() - lastSentAt.getTime() < EMAIL_VERIFICATION_RESEND_COOLDOWN_MS) {
-            return;
+            return 'skipped_cooldown';
         }
 
         const previousWindowStartedAt = user.emailVerificationWindowStartedAt;
@@ -288,7 +303,7 @@ export class AuthService {
             : 1;
 
         if (nextRequestsInWindow > EMAIL_VERIFICATION_RESEND_MAX_PER_WINDOW) {
-            return;
+            return 'skipped_rate_limit';
         }
 
         const rawToken = randomBytes(32).toString('hex');
@@ -311,11 +326,13 @@ export class AuthService {
             });
         } catch (error) {
             if (error instanceof Error && error.message.includes('Email delivery is not configured')) {
-                return;
+                return 'delivery_not_configured';
             }
 
             throw error;
         }
+
+        return 'sent';
     }
 }
 

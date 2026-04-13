@@ -31,11 +31,14 @@ export function authRoutes(service: AuthService): Router {
     const router = Router();
 
     router.post('/signup', validate(SignUpSchema), async (req: Request, res: Response) => {
-        const user = await service.register(req.body);
+        const { user, emailVerificationStatus } = await service.register(req.body);
+        const message = emailVerificationStatus === 'delivery_not_configured'
+            ? 'Account created, but the verification email could not be sent because email delivery is not configured on the server. Configure SMTP, then resend the verification email.'
+            : 'Account created. Verify your email before signing in.';
         res.status(201).json({
             ...toAuthPayload(user),
             verificationRequired: true,
-            message: 'Account created. Verify your email before signing in.',
+            message,
         });
     });
 

@@ -145,16 +145,20 @@ class InMemorySessionRepository implements SessionRepository {
 
 const existingPasswordHash = 'fedcba9876543210fedcba9876543210:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 
-function createService(initialUsers: User[] = []) {
+function createService(
+    initialUsers: User[] = [],
+    emailVerificationSender?: (payload: { to: string; name: string; verificationUrl: string }) => Promise<void>
+) {
     const userRepo = new InMemoryUserRepository(initialUsers);
     const workspaceRepo = new InMemoryWorkspaceRepository();
     const sessionRepo = new InMemorySessionRepository();
     const sentVerificationEmails: Array<{ to: string; name: string; verificationUrl: string }> = [];
+    const sender = emailVerificationSender ?? (async (payload) => {
+        sentVerificationEmails.push(payload);
+    });
 
     return {
-        service: new AuthService(userRepo, workspaceRepo, sessionRepo, async (payload) => {
-            sentVerificationEmails.push(payload);
-        }, new SignInThrottle()),
+        service: new AuthService(userRepo, workspaceRepo, sessionRepo, sender, new SignInThrottle()),
         userRepo,
         workspaceRepo,
         sessionRepo,
@@ -165,11 +169,12 @@ function createService(initialUsers: User[] = []) {
 test('register enforces uniqueness, normalizes email, and persists only a hash', async () => {
     const { service, workspaceRepo, sentVerificationEmails } = createService();
 
-    const user = await service.register({
+    const result = await service.register({
         name: 'Jane Doe',
         email: '  Jane@Example.com ',
         password: 'StrongPass1',
     });
+    const user = result.user;
 
     assert.equal(user.email, 'jane@example.com');
     assert.ok(user.workspaceId);
@@ -191,6 +196,21 @@ test('register enforces uniqueness, normalizes email, and persists only a hash',
         }),
         /A user with this email already exists/
     );
+});
+
+test('register keeps the account but reports when verification email delivery is not configured', async () => {
+    const { service } = createService([], async () => {
+        throw new Error('Email delivery is not configured. Missing SMTP_HOST.');
+    });
+
+    const result = await service.register({
+        name: 'Jane Doe',
+        email: 'jane@example.com',
+        password: 'StrongPass1',
+    });
+
+    assert.equal(result.user.email, 'jane@example.com');
+    assert.equal(result.emailVerificationStatus, 'delivery_not_configured');
 });
 
 test('register rejects weak passwords before hashing', async () => {
@@ -262,7 +282,7 @@ test('signIn rejects invalid passwords', async () => {
 
 test('signIn authenticates valid credentials and issues an expiring session token', async () => {
     const { service } = createService();
-    const user = await service.register({
+    const { user } = await service.register({
         name: 'Jane Doe',
         email: 'jane@example.com',
         password: 'StrongPass1',
@@ -539,7 +559,7 @@ test('signIn creates a session token and authenticated lookup resolves only thro
     });
     assert.equal(result, null);
 
-    const verifiedPasswordHashUser = await service.register({
+    const { user: verifiedPasswordHashUser } = await service.register({
         name: 'Session User',
         email: 'session@example.com',
         password: 'StrongPass1',
