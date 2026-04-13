@@ -81,6 +81,19 @@ function hashEmailVerificationToken(token: string) {
     return createHash('sha256').update(token).digest('hex');
 }
 
+function maskEmail(email: string) {
+    const [localPart = '', domain = ''] = email.split('@');
+    if (!localPart || !domain) {
+        return 'unknown';
+    }
+
+    if (localPart.length <= 2) {
+        return `${localPart[0] ?? '*'}*@${domain}`;
+    }
+
+    return `${localPart[0]}${'*'.repeat(Math.max(1, localPart.length - 2))}${localPart[localPart.length - 1]}@${domain}`;
+}
+
 export class AuthService {
     constructor(
         private readonly userRepo: UserRepository,
@@ -168,6 +181,9 @@ export class AuthService {
         const user = await this.userRepo.findByEmail(email);
 
         if (!user || user.deletedAt || user.isDisabled || user.isEmailVerified()) {
+            console.info('[Auth] Ignored verification email request', {
+                email: maskEmail(email),
+            });
             return 'ignored';
         }
 
@@ -291,6 +307,10 @@ export class AuthService {
         const lastSentAt = user.emailVerificationLastSentAt;
 
         if (lastSentAt && now.getTime() - lastSentAt.getTime() < EMAIL_VERIFICATION_RESEND_COOLDOWN_MS) {
+            console.info('[Auth] Skipped verification email request during cooldown', {
+                userId: user.id,
+                email: maskEmail(user.email),
+            });
             return 'skipped_cooldown';
         }
 
@@ -303,6 +323,10 @@ export class AuthService {
             : 1;
 
         if (nextRequestsInWindow > EMAIL_VERIFICATION_RESEND_MAX_PER_WINDOW) {
+            console.warn('[Auth] Skipped verification email request because the hourly limit was reached', {
+                userId: user.id,
+                email: maskEmail(user.email),
+            });
             return 'skipped_rate_limit';
         }
 
@@ -326,11 +350,26 @@ export class AuthService {
             });
         } catch (error) {
             if (error instanceof Error && error.message.includes('Email delivery is not configured')) {
+                console.warn('[Auth] Verification email delivery is not configured', {
+                    userId: user.id,
+                    email: maskEmail(user.email),
+                });
                 return 'delivery_not_configured';
             }
 
+            console.error('[Auth] Verification email delivery failed', {
+                userId: user.id,
+                email: maskEmail(user.email),
+                error: error instanceof Error ? error.message : String(error),
+            });
+
             throw error;
         }
+
+        console.info('[Auth] Verification email sent', {
+            userId: user.id,
+            email: maskEmail(user.email),
+        });
 
         return 'sent';
     }

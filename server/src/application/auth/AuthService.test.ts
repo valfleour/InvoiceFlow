@@ -398,10 +398,11 @@ test('requestEmailVerification issues a fresh token and verifyEmail marks the us
     });
     const { service, userRepo, sentVerificationEmails } = createService([existingUser]);
 
-    await service.requestEmailVerification({
+    const status = await service.requestEmailVerification({
         email: 'jane@example.com',
     });
 
+    assert.equal(status, 'sent');
     const updatedUser = await userRepo.findById('user-1');
     assert.ok(updatedUser?.emailVerificationTokenHash);
     assert.ok(updatedUser?.emailVerificationExpiresAt);
@@ -430,8 +431,8 @@ test('requestEmailVerification silently ignores unknown or already verified emai
     });
     const { service, sentVerificationEmails } = createService([verifiedUser]);
 
-    await service.requestEmailVerification({ email: 'missing@example.com' });
-    await service.requestEmailVerification({ email: 'jane@example.com' });
+    assert.equal(await service.requestEmailVerification({ email: 'missing@example.com' }), 'ignored');
+    assert.equal(await service.requestEmailVerification({ email: 'jane@example.com' }), 'ignored');
 
     assert.equal(sentVerificationEmails.length, 0);
 });
@@ -452,14 +453,14 @@ test('requestEmailVerification applies resend cooldown and hourly caps while kee
         });
         const { service, userRepo, sentVerificationEmails } = createService([existingUser]);
 
-        await service.requestEmailVerification({ email: 'jane@example.com' });
+        assert.equal(await service.requestEmailVerification({ email: 'jane@example.com' }), 'sent');
         const firstUser = await userRepo.findById('user-1');
         const firstTokenHash = firstUser?.emailVerificationTokenHash;
         assert.equal(sentVerificationEmails.length, 1);
         assert.equal(firstUser?.emailVerificationRequestsInWindow, 1);
 
         now += 30_000;
-        await service.requestEmailVerification({ email: 'jane@example.com' });
+        assert.equal(await service.requestEmailVerification({ email: 'jane@example.com' }), 'skipped_cooldown');
         const cooldownUser = await userRepo.findById('user-1');
         assert.equal(sentVerificationEmails.length, 1);
         assert.equal(cooldownUser?.emailVerificationTokenHash, firstTokenHash);
@@ -467,7 +468,7 @@ test('requestEmailVerification applies resend cooldown and hourly caps while kee
 
         now += 31_000;
         for (let attempt = 0; attempt < 4; attempt += 1) {
-            await service.requestEmailVerification({ email: 'jane@example.com' });
+            assert.equal(await service.requestEmailVerification({ email: 'jane@example.com' }), 'sent');
             now += 61_000;
         }
 
@@ -477,13 +478,13 @@ test('requestEmailVerification applies resend cooldown and hourly caps while kee
         const latestTokenHash = cappedUser?.emailVerificationTokenHash;
         assert.notEqual(latestTokenHash, firstTokenHash);
 
-        await service.requestEmailVerification({ email: 'jane@example.com' });
+        assert.equal(await service.requestEmailVerification({ email: 'jane@example.com' }), 'skipped_rate_limit');
         const afterCapUser = await userRepo.findById('user-1');
         assert.equal(sentVerificationEmails.length, 5);
         assert.equal(afterCapUser?.emailVerificationTokenHash, latestTokenHash);
 
         now += 1000 * 60 * 60;
-        await service.requestEmailVerification({ email: 'jane@example.com' });
+        assert.equal(await service.requestEmailVerification({ email: 'jane@example.com' }), 'sent');
         const nextWindowUser = await userRepo.findById('user-1');
         assert.equal(sentVerificationEmails.length, 6);
         assert.equal(nextWindowUser?.emailVerificationRequestsInWindow, 1);

@@ -60,9 +60,17 @@ export function authRoutes(service: AuthService): Router {
     });
 
     router.post('/verify-email/request', validate(RequestEmailVerificationSchema), async (req: Request, res: Response) => {
-        await service.requestEmailVerification(req.body);
+        const status = await service.requestEmailVerification(req.body);
+        const message = status === 'skipped_cooldown'
+            ? 'If an unverified account exists for that email, wait about a minute before requesting another verification link.'
+            : status === 'skipped_rate_limit'
+                ? 'If an unverified account exists for that email, too many verification links were requested recently. Try again in about an hour.'
+                : status === 'delivery_not_configured'
+                    ? 'Verification email delivery is temporarily unavailable on the server. Check the SMTP configuration and provider logs, then try again.'
+                    : 'If an unverified account exists for that email, a verification link has been sent.';
         res.json({
-            message: 'If an unverified account exists for that email, a verification link has been sent.',
+            status,
+            message,
         });
     });
 
