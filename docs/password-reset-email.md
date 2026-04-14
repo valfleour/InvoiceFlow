@@ -1,6 +1,32 @@
 # Email Delivery Setup
 
-InvoiceFlow sends password reset and email verification messages through Nodemailer over SMTP.
+InvoiceFlow sends password reset and email verification messages through either:
+
+- Resend over HTTPS when `RESEND_API_KEY` is set.
+- SMTP through Nodemailer when `RESEND_API_KEY` is not set.
+
+For Render-hosted production deployments, prefer Resend because free web services cannot send outbound SMTP traffic.
+
+## Production Setup On Render
+
+Use these values in your Render server environment:
+
+```env
+CLIENT_ORIGIN=https://your-frontend-domain
+PASSWORD_RESET_URL_ORIGIN=https://your-frontend-domain
+EMAIL_VERIFICATION_URL_ORIGIN=https://your-frontend-domain
+MAIL_FROM=InvoiceFlow <onboarding@your-domain>
+MAIL_APP_NAME=InvoiceFlow
+RESEND_API_KEY=re_xxxxxxxxx
+RESEND_API_BASE_URL=https://api.resend.com
+```
+
+Notes:
+
+1. `MAIL_FROM` must be a sender address your Resend account is allowed to use.
+2. The password reset link points to `/reset-password?token=...` on your live client.
+3. The verification link points to `/verify-email?token=...` on your live client.
+4. Keep the SMTP variables empty when using Resend.
 
 ## Local Gmail SMTP Setup
 

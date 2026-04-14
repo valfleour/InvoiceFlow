@@ -33,7 +33,7 @@ export function authRoutes(service: AuthService): Router {
     router.post('/signup', validate(SignUpSchema), async (req: Request, res: Response) => {
         const { user, emailVerificationStatus } = await service.register(req.body);
         const message = emailVerificationStatus === 'delivery_not_configured'
-            ? 'Account created, but the verification email could not be sent because email delivery is not configured on the server. Configure SMTP, then resend the verification email.'
+            ? 'Account created, but the verification email could not be sent because email delivery is not configured on the server. Configure an email provider, then resend the verification email.'
             : 'Account created. Verify your email before signing in.';
         res.status(201).json({
             ...toAuthPayload(user),
@@ -66,7 +66,7 @@ export function authRoutes(service: AuthService): Router {
             : status === 'skipped_rate_limit'
                 ? 'If an unverified account exists for that email, too many verification links were requested recently. Try again in about an hour.'
                 : status === 'delivery_not_configured'
-                    ? 'Verification email delivery is temporarily unavailable on the server. Check the SMTP configuration and provider logs, then try again.'
+                    ? 'Verification email delivery is temporarily unavailable on the server. Check the email delivery configuration and provider logs, then try again.'
                     : 'If an unverified account exists for that email, a verification link has been sent.';
         res.json({
             status,
