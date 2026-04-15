@@ -216,7 +216,7 @@ export function SignInPage() {
 
                         {showResendVerification ? (
                             <div className="access-secondary-panel">
-                                <p className="access-secondary-copy">
+                                <p className="access-secondary-copy access-secondary-copy-dark">
                                     Your account is not verified yet. Request a fresh verification email to unlock sign in.
                                 </p>
                                 <div className="access-inline-action-row">

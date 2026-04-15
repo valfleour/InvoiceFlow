@@ -987,6 +987,10 @@ button {
   line-height: 1.45;
 }
 
+.access-secondary-copy-dark {
+  color: #000000;
+}
+
 .access-input {
   width: 100%;
   padding: 12px 14px;
